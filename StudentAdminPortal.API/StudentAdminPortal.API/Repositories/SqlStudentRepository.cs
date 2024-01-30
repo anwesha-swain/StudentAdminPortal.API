@@ -32,7 +32,7 @@ namespace StudentAdminPortal.API.Repositories
             return await context.Student.AnyAsync(x => x.Id == studentId);
         }
 
-        public async Task<Student> UpdateStudent(Guid studentId, Student request)
+        public async Task<Student> UpdateStudentAsync(Guid studentId, Student request)
         {
             var existingStudent = await GetStudentByIdAsync(studentId);
             if (existingStudent != null)
@@ -48,6 +48,18 @@ namespace StudentAdminPortal.API.Repositories
 
                 await context.SaveChangesAsync();
                 return existingStudent;
+            }
+            return null;
+        }
+
+        public async Task<Student> DeleteStudentAsync(Guid studentId)
+        {
+            var student = await GetStudentByIdAsync(studentId);
+            if(student != null)
+            {
+                context.Student.Remove(student);
+                await context.SaveChangesAsync();
+                return student;
             }
             return null;
         }
