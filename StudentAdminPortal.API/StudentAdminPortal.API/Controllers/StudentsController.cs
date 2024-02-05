@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Client;
 using StudentAdminPortal.API.DataModels;
 using StudentAdminPortal.API.DomainModels;
 using StudentAdminPortal.API.Repositories;
+using System.Net.Sockets;
 
 namespace StudentAdminPortal.API.Controllers
 {
@@ -11,11 +13,13 @@ namespace StudentAdminPortal.API.Controllers
     {
         private readonly IStudentRepository studentRepository;
         private readonly IMapper mapper;
+        private readonly IImageRepository imageRepository;
 
-        public StudentsController(IStudentRepository studentRepository, IMapper mapper)
+        public StudentsController(IStudentRepository studentRepository, IMapper mapper, IImageRepository imageRepository)
         {
             this.studentRepository = studentRepository;
             this.mapper = mapper;
+            this.imageRepository = imageRepository;
         }
 
         [HttpGet]
@@ -64,7 +68,7 @@ namespace StudentAdminPortal.API.Controllers
             var student = await studentRepository.GetStudentByIdAsync(studentId);
 
             //Return student
-            if(student == null)
+            if (student == null)
             {
                 return NotFound();
             }
@@ -81,7 +85,7 @@ namespace StudentAdminPortal.API.Controllers
                 //Update details
                 var updatedStudent = await studentRepository.UpdateStudentAsync(studentId, mapper.Map<DataModels.Student>(request));
 
-                if(updatedStudent != null)
+                if (updatedStudent != null)
                 {
                     return Ok(mapper.Map<DomainModels.Student>(updatedStudent));
                 }
@@ -93,7 +97,7 @@ namespace StudentAdminPortal.API.Controllers
         [Route("[controller]/{studentId:guid}")]
         public async Task<IActionResult> DeleteStudent([FromRoute] Guid studentId)
         {
-            if(await studentRepository.Exists(studentId))
+            if (await studentRepository.Exists(studentId))
             {
                 var deletedStudent = await studentRepository.DeleteStudentAsync(studentId);
                 return Ok(mapper.Map<DomainModels.Student>(deletedStudent));
@@ -107,6 +111,26 @@ namespace StudentAdminPortal.API.Controllers
         {
             var student = await studentRepository.AddStudentAsync(mapper.Map<DataModels.Student>(request));
             return CreatedAtAction(nameof(GetStudentById), new { studentId = student.Id }, mapper.Map<DomainModels.Student>(student));
+        }
+
+        [HttpPost]
+        [Route("[controller]/{studentId:guid}/upload-image")]
+        public async Task<IActionResult> UploadImage([FromRoute] Guid studentId, IFormFile profileImage)
+        {
+            // check if student exists
+            if(await studentRepository.Exists(studentId))
+            {
+                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
+                // upload the image to local storage
+                var fileImagePath = await imageRepository.Upload(profileImage, fileName);
+                // update the profile image path in the database
+                if(await studentRepository.UpdateProfileImage(studentId, fileImagePath))
+                {
+                    return Ok(fileImagePath);
+                }
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error in uploading image");
+            }
+            return NotFound();
         }
     }
 }
